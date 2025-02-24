@@ -1,2 +1,4 @@
 node_modules/
 txn.bin
+keys.txt
+nonce-data.json

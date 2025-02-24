@@ -1,28 +1,35 @@
-const { Keypair, Transaction, SystemProgram, PublicKey } = require('@solana/web3.js');
+const { Keypair, Transaction, PublicKey, SystemProgram } = require('@solana/web3.js');
+const bs58 = require('bs58');
 const fs = require('fs');
 
-// For testing, generate a dummy keypair (real users will provide their own)
-const senderKeypair = Keypair.generate();
+const senderPrivateKeyBase58 = 'YOUR_WALLET_2_PRIVATE_KEY';
+const senderSecretKey = bs58.default.decode(senderPrivateKeyBase58);
+const senderKeypair = Keypair.fromSecretKey(senderSecretKey);
 console.log('Sender Public Key:', senderKeypair.publicKey.toString());
 
-// Replace with a test recipient (e.g., from Phantom Devnet wallet)
-const recipientPubkey = new PublicKey('GjS3HWjhLLh1xmQJBZsRpddaqnmf58myNfe1N3X7R56W');
+const recipientPubkey = new PublicKey('YOUR_WALLET_1_PUBLIC_KEY');
+const nonceData = JSON.parse(fs.readFileSync('nonce-data.json'));
+const noncePubkey = new PublicKey(nonceData.noncePubkey);
+const nonceValue = nonceData.nonceValue;
 
-// Create a SOL transfer transaction
-const transaction = new Transaction().add(
+const transaction = new Transaction({
+  feePayer: senderKeypair.publicKey,
+  nonceInfo: {
+    nonce: nonceValue,
+    nonceInstruction: SystemProgram.nonceAdvance({
+      noncePubkey: noncePubkey,
+      authorizedPubkey: senderKeypair.publicKey,
+    }),
+  },
+});
+transaction.add(
   SystemProgram.transfer({
     fromPubkey: senderKeypair.publicKey,
     toPubkey: recipientPubkey,
-    lamports: 100000000, // 0.1 SOL (100 million lamports)
+    lamports: 100000000,
   })
 );
 
-// Sign offline with a dummy blockhash
-transaction.recentBlockhash = '11111111111111111111111111111111'; // Placeholder
 transaction.sign(senderKeypair);
-
-// Save to file
-const serializedTxn = transaction.serialize();
-fs.writeFileSync('txn.bin', serializedTxn);
-
-console.log('Transaction saved as txn.bin');
+fs.writeFileSync('txn.bin', transaction.serialize());
+console.log('Signed transaction saved as txn.bin');
